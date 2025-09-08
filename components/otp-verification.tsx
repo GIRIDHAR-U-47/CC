@@ -23,9 +23,10 @@ export function OTPVerification({ phoneNumber, confirmationResult, onVerified, o
   const [resendTimer, setResendTimer] = useState(30)
   const [canResend, setCanResend] = useState(false)
   const [error, setError] = useState("")
-  const [currentConfirmationResult, setCurrentConfirmationResult] = useState(confirmationResult)
+  const [currentConfirmationResult, setCurrentConfirmationResult] = useState<ConfirmationResult | null>(null)
   const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
 
   useEffect(() => {
     if (resendTimer > 0) {
@@ -37,12 +38,18 @@ export function OTPVerification({ phoneNumber, confirmationResult, onVerified, o
   }, [resendTimer])
 
   useEffect(() => {
+    // Store the initial confirmation result in a ref
+    if (confirmationResult) {
+      confirmationResultRef.current = confirmationResult;
+      setCurrentConfirmationResult(confirmationResult);
+    }
+    
     // Setup reCAPTCHA for resend functionality
     if (typeof window !== 'undefined') {
       const verifier = setupRecaptcha('recaptcha-container-verify')
       setRecaptchaVerifier(verifier)
     }
-  }, [])
+  }, [confirmationResult])
 
   const handleOtpChange = (index: number, value: string) => {
     // Only allow numeric input
@@ -154,8 +161,14 @@ export function OTPVerification({ phoneNumber, confirmationResult, onVerified, o
         return
       }
 
+      // Use the ref instead of state to ensure we have the latest confirmation result
+      const confirmationToUse = confirmationResultRef.current;
+      if (!confirmationToUse) {
+        throw new Error('Session expired. Please request a new OTP.');
+      }
+      
       // Normal Firebase OTP verification
-      const result = await verifyOTP(currentConfirmationResult, otpString)
+      const result = await verifyOTP(confirmationToUse, otpString)
       
       // Save user to database after successful verification
       if (result.user) {
@@ -186,6 +199,8 @@ export function OTPVerification({ phoneNumber, confirmationResult, onVerified, o
     
     try {
       const newConfirmationResult = await sendOTP(phoneNumber, recaptchaVerifier)
+      // Update both ref and state
+      confirmationResultRef.current = newConfirmationResult;
       setCurrentConfirmationResult(newConfirmationResult)
     } catch (error: any) {
       console.error('Error resending OTP:', error)
