@@ -191,13 +191,28 @@ export const sendOTP = async (phoneNumber: string, recaptchaVerifier: RecaptchaV
   throw new Error(lastError?.message || 'Failed to send OTP after multiple attempts. Please try again later.');
 };
 
-export const verifyOTP = async (confirmationResult: ConfirmationResult, otp: string) => {
+export const verifyOTP = async (confirmationResult: ConfirmationResult | undefined, otp: string) => {
+  if (!confirmationResult) {
+    throw new Error('No confirmation result available. Please request a new OTP.');
+  }
+  
+  if (!otp || otp.length < 6) {
+    throw new Error('Please enter a valid 6-digit OTP code.');
+  }
+
   try {
     const result = await confirmationResult.confirm(otp);
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error verifying OTP:', error);
-    throw error;
+    if (error.code === 'auth/invalid-verification-code') {
+      throw new Error('Invalid verification code. Please check the code and try again.');
+    } else if (error.code === 'auth/code-expired') {
+      throw new Error('The verification code has expired. Please request a new OTP.');
+    } else if (error.code === 'auth/too-many-requests') {
+      throw new Error('Too many attempts. Please try again later.');
+    }
+    throw new Error(error.message || 'Failed to verify OTP. Please try again.');
   }
 };
 
