@@ -12,52 +12,113 @@ interface MapViewProps {
   setActiveTab: (tab: string) => void
 }
 
+// Mock data for Chennai T. Nagar area (within 1km radius) - same as dashboard feed
+// Base coordinates: T. Nagar (13.0418, 80.2341)
 const mockIssues = [
   {
     id: 1,
-    title: "Broken Street Light",
+    title: "Street Light Not Working",
     location: "Anna Salai, T. Nagar, Chennai",
     status: "pending",
-    lat: 13.0827,
-    lng: 80.2707,
+    lat: 13.0418,
+    lng: 80.2341,
     type: "lighting",
+    upvotes: 12,
+    comments: 3,
+    distance: "0.2 km",
+    reportedBy: "Rajesh K.",
   },
   {
     id: 2,
     title: "Large Pothole on Road",
-    location: "OMR, Thoraipakkam, Chennai",
+    location: "Pondy Bazaar Main Road, T. Nagar",
     status: "active",
-    lat: 12.9442,
-    lng: 80.2378,
+    lat: 13.0425,
+    lng: 80.2335,
     type: "road",
+    upvotes: 28,
+    comments: 7,
+    distance: "0.3 km",
+    reportedBy: "Priya S.",
   },
   {
     id: 3,
-    title: "Illegal Wall Posters",
-    location: "Pondy Bazaar, T. Nagar, Chennai",
-    status: "resolved",
-    lat: 13.0418,
-    lng: 80.2341,
-    type: "vandalism",
+    title: "Overflowing Garbage Bin",
+    location: "Ranganathan Street, T. Nagar",
+    status: "pending",
+    lat: 13.0435,
+    lng: 80.2348,
+    type: "waste",
+    upvotes: 15,
+    comments: 2,
+    distance: "0.4 km",
+    reportedBy: "Kumar M.",
   },
   {
     id: 4,
-    title: "Overflowing Garbage Bin",
-    location: "Marina Beach Road, Chennai",
-    status: "pending",
-    lat: 13.0499,
-    lng: 80.2824,
-    type: "waste",
+    title: "Broken Footpath",
+    location: "Usman Road, T. Nagar",
+    status: "active",
+    lat: 13.0408,
+    lng: 80.2355,
+    type: "road",
+    upvotes: 9,
+    comments: 1,
+    distance: "0.5 km",
+    reportedBy: "Lakshmi R.",
   },
   {
     id: 5,
-    title: "Water Logging Issue",
-    location: "Velachery Main Road, Chennai",
-    status: "active",
-    lat: 12.9759,
-    lng: 80.2201,
-    type: "drainage",
+    title: "Illegal Wall Posters",
+    location: "GN Chetty Road, T. Nagar",
+    status: "resolved",
+    lat: 13.0445,
+    lng: 80.2325,
+    type: "vandalism",
+    upvotes: 6,
+    comments: 0,
+    distance: "0.6 km",
+    reportedBy: "Arun V.",
   },
+  {
+    id: 6,
+    title: "Water Logging Issue",
+    location: "South Usman Road, T. Nagar",
+    status: "pending",
+    lat: 13.0395,
+    lng: 80.2365,
+    type: "drainage",
+    upvotes: 22,
+    comments: 5,
+    distance: "0.7 km",
+    reportedBy: "Meera P.",
+  },
+  {
+    id: 7,
+    title: "Damaged Traffic Signal",
+    location: "Thyagaraya Road Junction, T. Nagar",
+    status: "active",
+    lat: 13.0385,
+    lng: 80.2315,
+    type: "traffic",
+    upvotes: 35,
+    comments: 8,
+    distance: "0.8 km",
+    reportedBy: "Suresh B.",
+  },
+  {
+    id: 8,
+    title: "Stray Dogs Issue",
+    location: "Mambalam High Road, T. Nagar",
+    status: "pending",
+    lat: 13.0455,
+    lng: 80.2375,
+    type: "other",
+    upvotes: 18,
+    comments: 4,
+    distance: "0.9 km",
+    reportedBy: "Divya K.",
+  }
 ]
 
 export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
@@ -121,7 +182,7 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
             zoomControl: true,
             attributionControl: true
           })
-          mapRef.current.setView([13.0827, 80.2707], 12)
+          mapRef.current.setView([13.0418, 80.2341], 14)
           
           const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -193,10 +254,13 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
             }
           })
 
-          // Fetch reports and filter by distance
+          // Fetch reports and add markers at their exact locations
           try {
             const { getAllReports } = await import("@/lib/firebase")
             const reports = await getAllReports()
+            console.log('Fetched reports:', reports)
+            
+            // Calculate distance for filtering nearby reports
             const distance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
               const toRad = (d: number) => d * Math.PI / 180
               const R = 6371
@@ -205,12 +269,31 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
               const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2
               return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
             }
-            const nearby = reports.filter(r => distance(latitude, longitude, r.location.latitude, r.location.longitude) <= 10)
+            
+            // Filter reports within 50km radius (increased for better coverage)
+            const nearby = reports.filter(r => {
+              if (!r.location || typeof r.location.latitude !== 'number' || typeof r.location.longitude !== 'number') {
+                console.warn('Invalid location data for report:', r.id, r.location)
+                return false
+              }
+              return distance(latitude, longitude, r.location.latitude, r.location.longitude) <= 50
+            })
+            
+            console.log('Nearby reports:', nearby.length, 'out of', reports.length)
             setNearbyReports(nearby)
 
-            // Add markers for actual Firebase reports
+            // Add markers for actual Firebase reports at their exact locations
             nearby.forEach((report) => {
-              if (!mapRef.current) return
+              if (!mapRef.current || !report.location) return
+              
+              // Validate location data
+              const lat = report.location.latitude
+              const lng = report.location.longitude
+              if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+                console.warn('Invalid coordinates for report:', report.id, lat, lng)
+                return
+              }
+              
               try { 
                 const markerColor = getReportMarkerColor(report.status)
                 const categoryIcon = getCategoryIcon(report.category)
@@ -222,7 +305,8 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
                   iconAnchor: [14, 14]
                 })
                 
-                const marker = L.marker([report.location.latitude, report.location.longitude], { icon: reportIcon })
+                console.log('Adding marker for report:', report.title, 'at', lat, lng)
+                const marker = L.marker([lat, lng], { icon: reportIcon })
                   .addTo(mapRef.current)
                   .bindPopup(`
                     <div style="min-width: 200px;">
@@ -231,6 +315,7 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
                       <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Category:</strong> ${report.category}</p>
                       <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Status:</strong> <span style="color: ${markerColor};">${report.status}</span></p>
                       <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Priority:</strong> ${report.priority}</p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Address:</strong> ${report.location.address}</p>
                       <p style="margin: 0; font-size: 12px;"><strong>Reported:</strong> ${new Date(report.createdAt).toLocaleDateString()}</p>
                     </div>
                   `)
@@ -244,16 +329,20 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
                     status: report.status,
                     lat: report.location.latitude,
                     lng: report.location.longitude,
-                    type: report.category
+                    type: report.category,
+                    upvotes: 0,
+                    comments: 0,
+                    distance: "0 km",
+                    reportedBy: "Unknown"
                   })
                 })
               } catch (e) {
                 console.error('Error adding report marker:', e)
               }
             })
-          } catch (firebaseError) {
-            console.warn('Firebase error, using mock data:', firebaseError)
-            // Use mock issues as fallback
+            
+            // Always show mock data for demonstration (community feed issues)
+            console.log('Adding community feed issues to map')
             mockIssues.forEach((issue) => {
               if (!mapRef.current) return
               try { 
@@ -272,9 +361,12 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
                   .bindPopup(`
                     <div style="min-width: 200px;">
                       <h3 style="margin: 0 0 8px 0; font-weight: bold;">${issue.title}</h3>
-                      <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">Mock issue for demonstration</p>
+                      <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">Community reported issue</p>
                       <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Type:</strong> ${issue.type}</p>
                       <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Status:</strong> <span style="color: ${markerColor};">${issue.status}</span></p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Upvotes:</strong> ${issue.upvotes}</p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Distance:</strong> ${issue.distance}</p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Reported by:</strong> ${issue.reportedBy}</p>
                       <p style="margin: 0; font-size: 12px;"><strong>Location:</strong> ${issue.location}</p>
                     </div>
                   `)
@@ -283,20 +375,128 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
                   setSelectedIssue(issue)
                 })
               } catch (e) {
-                console.error('Error adding mock marker:', e)
+                console.error('Error adding community feed marker:', e)
+              }
+            })
+          } catch (firebaseError) {
+            console.warn('Firebase error, using community feed data:', firebaseError)
+            // Use community feed issues as fallback
+            mockIssues.forEach((issue) => {
+              if (!mapRef.current) return
+              try { 
+                const markerColor = getMarkerColor(issue.status)
+                const categoryIcon = getCategoryIcon(issue.type)
+                
+                const issueIcon = L.divIcon({
+                  html: `<div style="background: ${markerColor}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 12px;">${categoryIcon}</div>`,
+                  className: 'issue-marker',
+                  iconSize: [28, 28],
+                  iconAnchor: [14, 14]
+                })
+                
+                const marker = L.marker([issue.lat, issue.lng], { icon: issueIcon })
+                  .addTo(mapRef.current)
+                  .bindPopup(`
+                    <div style="min-width: 200px;">
+                      <h3 style="margin: 0 0 8px 0; font-weight: bold;">${issue.title}</h3>
+                      <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">Community reported issue</p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Type:</strong> ${issue.type}</p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Status:</strong> <span style="color: ${markerColor};">${issue.status}</span></p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Upvotes:</strong> ${issue.upvotes}</p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Distance:</strong> ${issue.distance}</p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px;"><strong>Reported by:</strong> ${issue.reportedBy}</p>
+                      <p style="margin: 0; font-size: 12px;"><strong>Location:</strong> ${issue.location}</p>
+                    </div>
+                  `)
+                
+                marker.on('click', () => {
+                  setSelectedIssue(issue)
+                })
+              } catch (e) {
+                console.error('Error adding community feed marker:', e)
               }
             })
           }
         }
 
-        navigator.geolocation.getCurrentPosition(
-          (pos) => handleWithCenter(pos.coords.latitude, pos.coords.longitude),
-          (err) => {
-            console.warn('Geolocation error', err)
-            // Chennai default center
-            handleWithCenter(13.0827, 80.2707)
+        // Enhanced GPS location detection with high accuracy
+        const getHighAccuracyLocation = () => {
+          const options = {
+            enableHighAccuracy: true,
+            timeout: 15000, // 15 seconds timeout
+            maximumAge: 60000 // Accept cached location up to 1 minute old
           }
-        )
+
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude, accuracy } = position.coords
+              console.log(`GPS Location: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`)
+              
+              // If accuracy is poor (>100m), try to get a better reading
+              if (accuracy > 100) {
+                console.log('GPS accuracy is poor, attempting to get better reading...')
+                // Try once more with stricter settings
+                const strictOptions = {
+                  enableHighAccuracy: true,
+                  timeout: 10000,
+                  maximumAge: 0 // Force fresh reading
+                }
+                
+                navigator.geolocation.getCurrentPosition(
+                  (betterPos) => {
+                    const { latitude: lat2, longitude: lng2, accuracy: acc2 } = betterPos.coords
+                    console.log(`Improved GPS Location: ${lat2}, ${lng2} (accuracy: ${acc2}m)`)
+                    handleWithCenter(lat2, lng2)
+                  },
+                  (err2) => {
+                    console.warn('Second GPS attempt failed, using first reading:', err2)
+                    handleWithCenter(latitude, longitude)
+                  },
+                  strictOptions
+                )
+              } else {
+                handleWithCenter(latitude, longitude)
+              }
+            },
+            (error) => {
+              console.error('Geolocation error:', error)
+              let errorMessage = 'Location access failed'
+              
+              switch (error.code) {
+                case error.PERMISSION_DENIED:
+                  errorMessage = 'Location access denied. Please enable location services.'
+                  setMapError('Location permission denied. Please enable location access in your browser settings.')
+                  break
+                case error.POSITION_UNAVAILABLE:
+                  errorMessage = 'Location information unavailable.'
+                  setMapError('GPS signal unavailable. Please check if location services are enabled.')
+                  break
+                case error.TIMEOUT:
+                  errorMessage = 'Location request timed out.'
+                  setMapError('GPS timeout. Trying to get location took too long.')
+                  break
+                default:
+                  errorMessage = 'Unknown location error.'
+                  setMapError('Unknown location error occurred.')
+                  break
+              }
+              
+              console.warn(errorMessage)
+              // Fall back to default location (T. Nagar, Chennai)
+              handleWithCenter(13.0418, 80.2341)
+            },
+            options
+          )
+        }
+
+        // Check if geolocation is supported
+        if (!navigator.geolocation) {
+          console.warn('Geolocation not supported by this browser')
+          setMapError('Geolocation not supported by your browser.')
+          handleWithCenter(13.0418, 80.2341)
+        } else {
+          getHighAccuracyLocation()
+        }
       } catch (e) {
         console.error('Map loading error:', e)
         setMapError('Failed to initialize map. Please check your internet connection.')
@@ -458,31 +658,89 @@ export function MapView({ onBack, activeTab, setActiveTab }: MapViewProps) {
             </div>
           )}
 
-          {/* Issue Markers - Better mobile touch targets */}
-          {filteredIssues.map((issue, index) => (
-            <button
-              key={issue.id}
-              onClick={() => setSelectedIssue(issue)}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 active:scale-95 p-2"
-              style={{
-                left: `${15 + ((index * 18) % 70)}%`,
-                top: `${25 + ((index * 25) % 50)}%`,
-              }}
-            >
-              <div className="relative">
-                <div
-                  className="w-8 h-8 sm:w-6 sm:h-6 rounded-full border-2 border-white shadow-lg"
-                  style={{ backgroundColor: getMarkerColor(issue.status) }}
-                />
-                <div className="absolute -top-1 -right-1 w-4 h-4 sm:w-3 sm:h-3 bg-white rounded-full flex items-center justify-center">
-                  <div className="w-2 h-2 sm:w-1.5 sm:h-1.5 bg-red-500 rounded-full animate-pulse" />
-                </div>
-              </div>
-            </button>
-          ))}
+          {/* Note: Markers are now handled by Leaflet in the map initialization */}
 
           {/* Current Location Button - Better mobile positioning */}
-          <Button size="icon" className="absolute bottom-4 right-4 w-12 h-12 sm:w-10 sm:h-10 rounded-full shadow-lg">
+          <Button 
+            size="icon" 
+            className="absolute bottom-4 right-4 w-12 h-12 sm:w-10 sm:h-10 rounded-full shadow-lg"
+            onClick={() => {
+              if (!navigator.geolocation) {
+                setMapError('Geolocation not supported by your browser.')
+                return
+              }
+              
+              // Show loading state
+              const button = document.querySelector('.absolute.bottom-4.right-4') as HTMLElement
+              if (button) {
+                button.style.opacity = '0.5'
+                button.style.pointerEvents = 'none'
+              }
+              
+              const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0 // Force fresh reading
+              }
+              
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  const { latitude, longitude, accuracy } = position.coords
+                  console.log(`Manual GPS Location: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`)
+                  
+                  if (mapRef.current) {
+                    mapRef.current.setView([latitude, longitude], 16)
+                    
+                    // Update user location marker
+                    const userIcon = (window as any).L?.divIcon({
+                      html: '<div style="background: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                      className: 'user-location-marker',
+                      iconSize: [22, 22],
+                      iconAnchor: [11, 11]
+                    })
+                    
+                    if (userIcon) {
+                      (window as any).L?.marker([latitude, longitude], { icon: userIcon })
+                        .addTo(mapRef.current)
+                        .bindPopup(`Your current location (accuracy: ${Math.round(accuracy)}m)`)
+                        .openPopup()
+                    }
+                  }
+                  
+                  // Reset button state
+                  if (button) {
+                    button.style.opacity = '1'
+                    button.style.pointerEvents = 'auto'
+                  }
+                },
+                (error) => {
+                  console.error('Manual location error:', error)
+                  let errorMsg = 'Failed to get current location'
+                  
+                  switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                      errorMsg = 'Location permission denied'
+                      break
+                    case error.POSITION_UNAVAILABLE:
+                      errorMsg = 'GPS signal unavailable'
+                      break
+                    case error.TIMEOUT:
+                      errorMsg = 'Location request timed out'
+                      break
+                  }
+                  
+                  setMapError(errorMsg)
+                  
+                  // Reset button state
+                  if (button) {
+                    button.style.opacity = '1'
+                    button.style.pointerEvents = 'auto'
+                  }
+                },
+                options
+              )
+            }}
+          >
             <Navigation className="w-5 h-5 sm:w-4 sm:h-4" />
           </Button>
         </div>
